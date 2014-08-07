@@ -13,10 +13,23 @@ import (
 
 type responseWriter struct {
 	http.ResponseWriter
-	gzipped *gzip.Writer
+	gzipped       *gzip.Writer
+	headerWritten bool
+}
+
+func (w *responseWriter) WriteHeader(status int) {
+	w.headerWritten = true
+	w.ResponseWriter.WriteHeader(status)
 }
 
 func (w *responseWriter) Write(data []byte) (int, error) {
+	// Try to detect the content type if one wasn't provided.
+	// If we don't do this, the underlying http.ResponseWriter
+	// does and sets it to application/gzip.
+	if !w.headerWritten && w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", http.DetectContentType(data))
+	}
+
 	return w.gzipped.Write(data)
 }
 
@@ -32,7 +45,10 @@ func Handler(h http.Handler) http.Handler {
 		gw := gzip.NewWriter(w)
 		defer gw.Close()
 
-		grw := responseWriter{w, gw}
+		grw := responseWriter{
+			ResponseWriter: w,
+			gzipped:        gw,
+		}
 
 		w.Header().Set("Vary", "Accept-Encoding")
 		w.Header().Set("Content-Encoding", "gzip")
