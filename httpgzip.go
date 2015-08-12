@@ -33,6 +33,13 @@ func (w *responseWriter) Write(data []byte) (int, error) {
 	return w.gzipped.Write(data)
 }
 
+func (w *responseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		w.gzipped.Flush()
+		f.Flush()
+	}
+}
+
 // Handler wraps the provided http.Handler with one that provides
 // transparent gzip content encoding.
 func Handler(h http.Handler) http.Handler {
